@@ -9,7 +9,7 @@ app = FastAPI()
 model = joblib.load('model_lri.joblib')
 
 # Set up PostgreSQL connection
-conn = psycopg2.connect(database="your_db", user="your_user", password="your_password", host="your_host", port="your_port")
+conn = psycopg2.connect(database="your_db", user="postgres", password="Jerry@126", host="localhost", port="5432")
 cursor = conn.cursor()
 
 class Features(BaseModel):
