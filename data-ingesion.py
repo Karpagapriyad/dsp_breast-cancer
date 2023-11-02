@@ -1,7 +1,8 @@
 from sklearn.datasets import load_breast_cancer
+from sklearn.impute import SimpleImputer
 import pandas as pd
 import os
-from sklearn.impute import SimpleImputer
+import psycopg2
 
 
 def save_breast_cancer_data(num_data_points, directory_a):
@@ -19,12 +20,15 @@ def save_breast_cancer_data(num_data_points, directory_a):
         df.to_csv(file_name, index=False)
 
 
-def validate_and_store_files(input_folder, output_folder_good, output_folder_bad):
+def validate_and_store_files(input_folder, output_folder_good, output_folder_bad, database):
     # List all CSV files in the input folder
     csv_files = [f for f in os.listdir(input_folder) if f.endswith('.csv')]
 
     # Initialize SimpleImpute to check for missing values
     impute = SimpleImputer(strategy='constant', fill_value=None)
+
+    conn = psycopg2.connect(**database)
+    cursor = conn.cursor()
 
     for file in csv_files:
         file_path = os.path.join(input_folder, file)
@@ -32,21 +36,39 @@ def validate_and_store_files(input_folder, output_folder_good, output_folder_bad
         data = pd.read_csv(file_path)
 
         # Check for missing values in the DataFrame
-        missing_values = impute.fit_transform(data)
-        if (missing_values == None).any():
-            # If missing values are found, move the file to the bad data folder
+        if (data < 0).any().any() or data.isnull().values.any():
+            # If negative or missing values are found, move the file to the bad data folder
             output_path = os.path.join(output_folder_bad, file)
             data.to_csv(output_path, index=False)
+
+            # Store statistics about negative and missing values in the database
+            negative_value_count = (data < 0).sum().sum()
+            missing_value_count = data.isnull().sum().sum()
+            cursor.execute(
+                "INSERT INTO data_quality_statistics (file_name, negative_value_count, missing_value_count) VALUES (%s, %s, %s)",
+                (file, negative_value_count, missing_value_count))
+            conn.commit()
         else:
-            # If no missing values are found, move the file to the good data folder
+            # If no negative or missing values are found, move the file to the good data folder
             output_path = os.path.join(output_folder_good, file)
             data.to_csv(output_path, index=False)
 
+            # Close database connection
+        cursor.close()
+        conn.close()
 
-input_folder = '/Users/karpagapriyadhanraj/Desktop/EPITA/DSP/dsp_breast-cancer/Folder-A/'
-output_folder_good = '/Users/karpagapriyadhanraj/Desktop/EPITA/DSP/dsp_breast-cancer/Folder-C'
-output_folder_bad = '/Users/karpagapriyadhanraj/Desktop/EPITA/DSP/dsp_breast-cancer/Folder-B'
+
+db_connection = {
+    "host": "localhost",
+    "database": "breast_cancer",
+    "user": "postgres",
+    "password": "123456"
+}
+
+folder_a = '/Users/karpagapriyadhanraj/Desktop/EPITA/DSP/dsp_breast-cancer/Folder-A/'
+folder_b = '/Users/karpagapriyadhanraj/Desktop/EPITA/DSP/dsp_breast-cancer/Folder-C'
+folder_c = '/Users/karpagapriyadhanraj/Desktop/EPITA/DSP/dsp_breast-cancer/Folder-B'
 
 num_data_points_per_file = 100
-save_breast_cancer_data(num_data_points_per_file, input_folder)
-validate_and_store_files(input_folder, output_folder_good, output_folder_bad)
+save_breast_cancer_data(num_data_points_per_file, folder_a)
+validate_and_store_files(folder_a, folder_c, folder_b, db_connection)
