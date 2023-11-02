@@ -1,6 +1,5 @@
 from fastapi import FastAPI, HTTPException, Query, Body
-from sqlalchemy import create_engine, Column, Integer, String, DateTime
-from sqlalchemy.orm import sessionmaker
+import psycopg2
 from pydantic import BaseModel
 from datetime import datetime
 
@@ -8,26 +7,24 @@ from datetime import datetime
 app = FastAPI()
 
 # Database connection setup
-database_url = "postgresql://username:password@localhost/dbname"
-engine = create_engine(database_url)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+database_url = "postgresql://postgres:password@localhost/dbname"
+conn = psycopg2.connect(database_url)
+cur = conn.cursor()
 
-# Define a SQLAlchemy model for predictions
-from sqlalchemy.ext.declarative import declarative_base
+# Define a SQL query for creating the predictions table if it doesn't exist
+create_table_query = """
+CREATE TABLE IF NOT EXISTS predictions (
+    id SERIAL PRIMARY KEY,
+    input_features TEXT,
+    output_prediction TEXT,
+    prediction_date TIMESTAMP,
+    source TEXT
+);
+"""
 
-Base = declarative_base()
-
-class Prediction(Base):
-    __tablename__ = "predictions"
-
-    id = Column(Integer, primary_key=True, index=True)
-    input_features = Column(String)
-    output_prediction = Column(String)
-    prediction_date = Column(DateTime)
-    source = Column(String)
-
-# Create the table if it doesn't exist
-Base.metadata.create_all(bind=engine)
+# Execute the query and commit the changes
+cur.execute(create_table_query)
+conn.commit()
 
 # Pydantic models for request and response
 class PredictionRequest(BaseModel):
@@ -40,7 +37,7 @@ class PastPredictionResponse(BaseModel):
     id: int
     input_features: str
     output_prediction: str
-    prediction_date: DateTime
+    prediction_date: datetime
     source: str
 
 # Endpoint for making predictions
@@ -52,32 +49,32 @@ def predict(prediction_request: PredictionRequest, source: str = Query(...)):
     prediction_date = datetime.now()
     
     # Save the prediction to the database
-    with SessionLocal() as db_session:
-        db_prediction = Prediction(
-            input_features=input_features,
-            output_prediction="Your Model's Prediction",
-            prediction_date=prediction_date,
-            source=source
-        )
-        db_session.add(db_prediction)
-        db_session.commit()
+    insert_query = """
+    INSERT INTO predictions (input_features, output_prediction, prediction_date, source)
+    VALUES (%s, %s, %s, %s)
+    """
+    cur.execute(insert_query, (input_features, "Your Model's Prediction", prediction_date, source))
+    conn.commit()
     
     return {"output_prediction": "Your Model's Prediction"}
 
 # Endpoint for getting past predictions
 @app.get("/past-predictions/", response_model=list[PastPredictionResponse])
 def past_predictions():
-    with SessionLocal() as db_session:
-        db_predictions = db_session.query(Prediction).all()
+    select_query = """
+    SELECT * FROM predictions;
+    """
+    cur.execute(select_query)
+    db_predictions = cur.fetchall()
     
     past_predictions = []
     for db_prediction in db_predictions:
         past_predictions.append({
-            "id": db_prediction.id,
-            "input_features": db_prediction.input_features,
-            "output_prediction": db_prediction.output_prediction,
-            "prediction_date": db_prediction.prediction_date,
-            "source": db_prediction.source
+            "id": db_prediction[0],
+            "input_features": db_prediction[1],
+            "output_prediction": db_prediction[2],
+            "prediction_date": db_prediction[3],
+            "source": db_prediction[4]
         })
     
     return past_predictions
