@@ -1,7 +1,7 @@
 from sklearn.datasets import load_breast_cancer
 import pandas as pd
-import tensorflow_data_validation as tfdv
 import os
+from sklearn.impute import SimpleImputer
 
 
 def save_breast_cancer_data(num_data_points, directory_a):
@@ -19,59 +19,34 @@ def save_breast_cancer_data(num_data_points, directory_a):
         df.to_csv(file_name, index=False)
 
 
+def validate_and_store_files(input_folder, output_folder_good, output_folder_bad):
+    # List all CSV files in the input folder
+    csv_files = [f for f in os.listdir(input_folder) if f.endswith('.csv')]
 
-# Function to validate data quality using TFDV for files in folder A
-def validate_and_store_files(input_folder, output_folder_c, output_folder_b, database):
-    # Get a list of CSV files in the input folder
-    file_list = [file for file in os.listdir(input_folder) if file.endswith('.csv')]
+    # Initialize SimpleImpute to check for missing values
+    impute = SimpleImputer(strategy='constant', fill_value=None)
 
-    # Iterate through each CSV file in the input folder
-    for file_name in file_list:
-        input_file_path = os.path.join(input_folder, file_name)
+    for file in csv_files:
+        file_path = os.path.join(input_folder, file)
+        # Read the CSV file into a pandas DataFrame
+        data = pd.read_csv(file_path)
 
-        # Load data from CSV file
-        data = pd.read_csv(input_file_path)
-
-        # Perform data validation using TFDV
-        stats = tfdv.generate_statistics_from_dataframe(dataframe=data)
-        schema = tfdv.infer_schema(statistics=stats)
-        anomalies = tfdv.validate_statistics(statistics=stats, schema=schema)
-
-        # Check if data quality issues are found
-        if not anomalies.total_anomalies:
-            # No data quality issues found, store the file in folder C
-            output_file_path_c = os.path.join(output_folder_c, file_name)
-            data.to_csv(output_file_path_c, index=False)
-            print(f'File stored in folder C: {output_file_path_c}')
+        # Check for missing values in the DataFrame
+        missing_values = impute.fit_transform(data)
+        if (missing_values == None).any():
+            # If missing values are found, move the file to the bad data folder
+            output_path = os.path.join(output_folder_bad, file)
+            data.to_csv(output_path, index=False)
         else:
-            # Data quality issues found, store the file in folder B
-            output_file_path_b = os.path.join(output_folder_b, file_name)
-            data_with_issues = data[anomalies.row_anomalies()]
-            data_without_issues = data.drop(index=data_with_issues.index)
-
-            # Save the files with and without issues in folder B
-            data_with_issues.to_csv(output_file_path_b, index=False)
-            print(f'File with data issues stored in folder B: {output_file_path_b}')
-
-            # Save data problems statistics in the database
-            data_problem_stats = {
-                'file_path': output_file_path_b,
-                'total_anomalies': anomalies.total_anomalies,
-                'column_anomalies': len(anomalies.schema_anomalies),
-                # Add more statistics as needed
-            }
-            database.save_data_problem_stats(data_problem_stats)
-
-            # Save the file without issues in folder C
-            output_file_path_c = os.path.join(output_folder_c, file_name)
-            data_without_issues.to_csv(output_file_path_c, index=False)
-            print(f'File without data issues stored in folder C: {output_file_path_c}')
+            # If no missing values are found, move the file to the good data folder
+            output_path = os.path.join(output_folder_good, file)
+            data.to_csv(output_path, index=False)
 
 
-# Example usage of the function
-# validate_and_store_files('folder_A', 'folder_C', 'folder_B', database)
+input_folder = '/Users/karpagapriyadhanraj/Desktop/EPITA/DSP/dsp_breast-cancer/Folder-A/'
+output_folder_good = '/Users/karpagapriyadhanraj/Desktop/EPITA/DSP/dsp_breast-cancer/Folder-C'
+output_folder_bad = '/Users/karpagapriyadhanraj/Desktop/EPITA/DSP/dsp_breast-cancer/Folder-B'
 
-
-output_directory = '/Users/karpagapriyadhanraj/Desktop/EPITA/DSP/dsp_breast-cancer/Folder-A/'
 num_data_points_per_file = 100
-save_breast_cancer_data(num_data_points_per_file, output_directory)
+save_breast_cancer_data(num_data_points_per_file, input_folder)
+validate_and_store_files(input_folder, output_folder_good, output_folder_bad)
