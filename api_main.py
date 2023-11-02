@@ -1,80 +1,63 @@
-from fastapi import FastAPI, HTTPException, Query, Body
-import psycopg2
+from fastapi import FastAPI
 from pydantic import BaseModel
-from datetime import datetime
+import joblib
+import psycopg2
 
-# Create a FastAPI instance
 app = FastAPI()
 
-# Database connection setup
-database_url = "postgresql://postgres:password@localhost/dbname"
-conn = psycopg2.connect(database_url)
-cur = conn.cursor()
+# Load the machine learning model
+model = joblib.load('model_lri.joblib')
 
-# Define a SQL query for creating the predictions table if it doesn't exist
-create_table_query = """
-CREATE TABLE IF NOT EXISTS predictions (
-    id SERIAL PRIMARY KEY,
-    input_features TEXT,
-    output_prediction TEXT,
-    prediction_date TIMESTAMP,
-    source TEXT
-);
-"""
+# Set up PostgreSQL connection
+conn = psycopg2.connect(database="your_db", user="your_user", password="your_password", host="your_host", port="your_port")
+cursor = conn.cursor()
 
-# Execute the query and commit the changes
-cur.execute(create_table_query)
-conn.commit()
-
-# Pydantic models for request and response
-class PredictionRequest(BaseModel):
-    input_features: str
+class Features(BaseModel):
+    mean_radius: float
+    mean_texture: float
+    mean_perimeter: float
+    mean_area: float
 
 class PredictionResponse(BaseModel):
-    output_prediction: str
+    prediction: str
 
 class PastPredictionResponse(BaseModel):
-    id: int
-    input_features: str
-    output_prediction: str
-    prediction_date: datetime
-    source: str
+    past_predictions: list
 
-# Endpoint for making predictions
-@app.post("/predict/", response_model=PredictionResponse)
-def predict(prediction_request: PredictionRequest, source: str = Query(...)):
-    # Perform your model prediction here
-    # For this example, we'll just return the input features
-    input_features = prediction_request.input_features
-    prediction_date = datetime.now()
+@app.post('/predict', response_model=PredictionResponse)
+def predict(features: Features):
+    # Convert features to a list for model prediction
+    features_list = [features.mean_radius, features.mean_texture, features.mean_perimeter, features.mean_area]
     
-    # Save the prediction to the database
-    insert_query = """
-    INSERT INTO predictions (input_features, output_prediction, prediction_date, source)
-    VALUES (%s, %s, %s, %s)
-    """
-    cur.execute(insert_query, (input_features, "Your Model's Prediction", prediction_date, source))
+    # Make predictions using the loaded model
+    prediction = model.predict([features_list])[0]
+    
+    # Map prediction to 'benign' or 'malignant'
+    prediction_label = 'benign' if prediction == 0 else 'malignant'
+
+    # Save prediction and features to PostgreSQL
+    cursor.execute("INSERT INTO predictions (mean_radius, mean_texture, mean_perimeter, mean_area, prediction) VALUES (%s, %s, %s, %s, %s)", (features.mean_radius, features.mean_texture, features.mean_perimeter, features.mean_area, prediction_label))
     conn.commit()
-    
-    return {"output_prediction": "Your Model's Prediction"}
 
-# Endpoint for getting past predictions
-@app.get("/past-predictions/", response_model=list[PastPredictionResponse])
+    return {"prediction": prediction_label}
+
+@app.get('/past_predictions', response_model=PastPredictionResponse)
 def past_predictions():
-    select_query = """
-    SELECT * FROM predictions;
-    """
-    cur.execute(select_query)
-    db_predictions = cur.fetchall()
-    
+    # Retrieve past predictions and features from the database
+    cursor.execute("SELECT mean_radius, mean_texture, mean_perimeter, mean_area, prediction FROM predictions")
     past_predictions = []
-    for db_prediction in db_predictions:
-        past_predictions.append({
-            "id": db_prediction[0],
-            "input_features": db_prediction[1],
-            "output_prediction": db_prediction[2],
-            "prediction_date": db_prediction[3],
-            "source": db_prediction[4]
-        })
-    
-    return past_predictions
+    for row in cursor.fetchall():
+        features = {
+            'mean_radius': row[0],
+            'mean_texture': row[1],
+            'mean_perimeter': row[2],
+            'mean_area': row[3]
+        }
+        prediction_label = row[4]
+        past_predictions.append({'features': features, 'prediction': prediction_label})
+
+    return {"past_predictions": past_predictions}
+
+if __name__ == '__main__':
+    import uvicorn
+    uvicorn.run(app, host='0.0.0.0', port=8000)
