@@ -1,7 +1,8 @@
 import psycopg2
 import csv
 import json
- 
+
+
 # Function to establish a database connection
 def connect_to_database(dbname, username, password, host, port):
     conn = psycopg2.connect(
@@ -12,112 +13,108 @@ def connect_to_database(dbname, username, password, host, port):
         port=port
     )
     return conn
- 
+
+
 # Function to check if a database exists
-def database_exists(dbname, username, password, host, port):
+def create_database_if_not_exists(connection, new_database_name):
     try:
-        conn = connect_to_database('postgres', username, password, host, port)
-        cur = conn.cursor()
-        cur.execute(
-            "SELECT 1 FROM pg_database WHERE datname = %s;",
-            (dbname,)
-        )
-        return cur.fetchone() is not None
-    finally:
-        cur.close()
-        conn.close()
- 
-# Function to create a new database if it doesn't exist
-def create_database_if_not_exists(dbname, username, password, host, port):
-    if not database_exists(dbname, username, password, host, port):
-        try:
-            conn = connect_to_database('postgres', username, password, host, port)
-            cur = conn.cursor()
-            cur.execute(
-                "CREATE DATABASE %s;",
-                (dbname,)
-            )
-            print(f"Database '{dbname}' created successfully")
-        finally:
-            cur.close()
-            conn.close()
- 
+        cursor = connection.cursor()
+
+        # Check if the database exists
+        cursor.execute("SELECT 1 FROM pg_catalog.pg_database WHERE datname = %s;", (new_database_name,))
+        existing_database = cursor.fetchone()
+
+        if not existing_database:
+            # Create a new database if it doesn't exist
+            cursor.execute(f"CREATE DATABASE {new_database_name};")
+            print(f"Database '{new_database_name}' created successfully.")
+        else:
+            print(f"Database '{new_database_name}' already exists.")
+
+        # Close the cursor and commit the changes
+        cursor.close()
+        connection.commit()
+
+    except Exception as error:
+        print(f"Error: Unable to create database - {error}")
+
+
 # Function to check if a table exists
-def table_exists(table_name, conn):
-    cur = conn.cursor()
-    cur.execute(
-        "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = %s);",
-        (table_name,)
-    )
-    return cur.fetchone()[0]
- 
-# Function to create a new table if it doesn't exist
-def create_table_if_not_exists(table_name, header_columns, conn):
-    if not table_exists(table_name, conn):
-        try:
-            cur = conn.cursor()
-            columns = ', '.join([f"{col} TEXT" for col in header_columns])
-            create_table_query = f'''
-            CREATE TABLE {table_name} (
-                id SERIAL PRIMARY KEY,
-                {columns}
-            );
-            '''
-            cur.execute(create_table_query)
-            print(f"Table '{table_name}' created successfully")
-        finally:
-            cur.close()
- 
+def create_table(connection, table_name, table_schema):
+    cursor = connection.cursor()
+
+    cursor.execute(f"CREATE TABLE {table_name} ({table_schema});")
+    print(f"Table '{table_name}' created successfully.")
+
+    cursor.close()
+    connection.commit()
+
+
 # Function to insert data from CSV file into the table
-def insert_csv_data_into_table(csv_filename, table_name, dbname, username, password, host, port):
-    conn = connect_to_database(dbname, username, password, host, port)
-    with open(csv_filename, 'r') as csvfile:
-        csv_reader = csv.DictReader(csvfile)
-        header_columns = csv_reader.fieldnames
-        create_table_if_not_exists(table_name, header_columns, conn)
-        try:
-            cur = conn.cursor()
-            for row in csv_reader:
-                columns = ', '.join(row.keys())
-                values = ', '.join(['%s'] * len(row))
-                insert_query = f'INSERT INTO {table_name} ({columns}) VALUES ({values});'
-                cur.execute(insert_query, list(row.values()))
-            conn.commit()
-            print(f"Data from CSV file '{csv_filename}' inserted into '{table_name}' table successfully")
-        finally:
-            cur.close()
-            conn.close()
- 
+def insert_data_from_csv(file_path):
+    cursor = connection.cursor()
+    table_check_query = "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'your_table_name')"
+    cursor.execute(table_check_query)
+    table_exists = cursor.fetchone()[0]
+
+    if not table_exists:
+        create_table(connection, table_name, table_schema)
+
+        # Read data from the CSV file and insert it into the table.
+    with open(file_path, 'r') as csv_file:
+        csv_reader = csv.reader(csv_file)
+        next(csv_reader)  # Skip the header row if it exists in the CSV file.
+    for row in csv_reader:
+        id, radius_mean, texture_mean, perimeter_mean, area_mean, diagnosis = row
+        insert_query = f'''
+            INSERT INTO your_table_name (id, radius_mean, texture_mean, perimeter_mean, area_mean, diagnosis)
+            VALUES ({id}, {radius_mean}, {texture_mean}, {perimeter_mean}, {area_mean}, '{diagnosis}')
+            '''
+        cursor.execute(insert_query)
+
+    connection.commit()
+    cursor.close()
+
+
 # Function to insert a single data point from JSON file into the table
 def insert_json_data_into_table(json_filename, table_name, dbname, username, password, host, port):
-    conn = connect_to_database(dbname, username, password, host, port)
-    with open(json_filename, 'r') as jsonfile:
-        data = json.load(jsonfile)
-        create_table_if_not_exists(table_name, data.keys(), conn)
-        try:
-            cur = conn.cursor()
-            columns = ', '.join(data.keys())
-            values = ', '.join(['%s'] * len(data))
-            insert_query = f'INSERT INTO {table_name} ({columns}) VALUES ({values});'
-            cur.execute(insert_query, list(data.values()))
-            conn.commit()
-            print(f"Data from JSON file '{json_filename}' inserted into '{table_name}' table successfully")
-        finally:
-            cur.close()
-            conn.close()
- 
+    cursor = connection.cursor()
+    table_check_query = "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'your_table_name')"
+    cursor.execute(table_check_query)
+    table_exists = cursor.fetchone()[0]
+
+    if not table_exists:
+        create_table(connection, table_name, table_schema)
+    json_data = json.loads(json_data)  # Parse JSON string to dictionary
+    id = json_data.get("id")
+    radius_mean = json_data.get("radius_mean")
+    texture_mean = json_data.get("texture_mean")
+    perimeter_mean = json_data.get("perimeter_mean")
+    area_mean = json_data.get("area_mean")
+    diagnosis = json_data.get("diagnosis")
+
+    insert_query = f'''
+                INSERT INTO your_table_name (id, radius_mean, texture_mean, perimeter_mean, area_mean, diagnosis)
+                VALUES ({id}, {radius_mean}, {texture_mean}, {perimeter_mean}, {area_mean}, '{diagnosis}')
+            '''
+    cursor.execute(insert_query)
+    connection.commit()
+    print("Data inserted successfully!")
+    if connection:
+        cursor.close()
+        connection.close()
+
 # Example usage
 if __name__ == "__main__":
-    dbname = "Breast Cancer Prediction Database"
-    username = "postgres"
-    password = "Bholenath!2023"
-    host = "localhost"
-    port = "5432"
-    csv_filename = "your_csv_file.csv"
-    json_filename = "your_json_file.json"
-    csv_table_name = "csv_table"
-    json_table_name = "json_table"
- 
-    create_database_if_not_exists(dbname, username, password, host, port)
-    insert_csv_data_into_table(csv_filename, csv_table_name, dbname, username, password, host, port)
-    insert_json_data_into_table(json_filename, json_table_name, dbname, username, password, host, port)
+    db_name = "breast_cancer"
+    user_name = "postgres"
+    db_password = "123456"
+    db_host = "localhost"
+    port_no = "5432"
+    table_name = 'past_prediction'
+    table_schema = 'id SERIAL PRIMARY KEY, radius_mean FLOAT, texture_mean FLOAT, perimeter_mean FLOAT, area_mean FLOAT,diagnosis VARCHAR(255)'
+
+    connection = connect_to_database(db_name, user_name, db_password, db_host, port_no)
+    create_database_if_not_exists(connection, db_name)
+    create_table(connection, table_name, table_schema)
+
