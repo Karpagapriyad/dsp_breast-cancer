@@ -1,5 +1,7 @@
 from sklearn.datasets import load_breast_cancer
 from sklearn.impute import SimpleImputer
+from db_connection import connect_to_database()
+from Test_Connection import insert_not_quality_data(file_name, negative_value_count, missing_value_count)
 import pandas as pd
 import os
 import psycopg2
@@ -44,9 +46,7 @@ def validate_and_store_files(input_folder, output_folder_good, output_folder_bad
             # Store statistics about negative and missing values in the database
             negative_value_count = (data < 0).sum().sum()
             missing_value_count = data.isnull().sum().sum()
-            cursor.execute(
-                "INSERT INTO data_quality_statistics (file_name, negative_value_count, missing_value_count) VALUES (%s, %s, %s)",
-                (file, negative_value_count, missing_value_count))
+            cursor.execute(insert_not_quality_data(file, negative_value_count, missing_value_count))
             conn.commit()
         else:
             # If no negative or missing values are found, move the file to the good data folder
@@ -58,12 +58,7 @@ def validate_and_store_files(input_folder, output_folder_good, output_folder_bad
         conn.close()
 
 
-db_connection = {
-    "host": "localhost",
-    "database": "breast_cancer",
-    "user": "postgres",
-    "password": "123456"
-}
+connection = connect_to_database
 
 folder_a = '/Users/karpagapriyadhanraj/Desktop/EPITA/DSP/dsp_breast-cancer/Folder-A/'
 folder_b = '/Users/karpagapriyadhanraj/Desktop/EPITA/DSP/dsp_breast-cancer/Folder-C'
@@ -71,4 +66,4 @@ folder_c = '/Users/karpagapriyadhanraj/Desktop/EPITA/DSP/dsp_breast-cancer/Folde
 
 num_data_points_per_file = 100
 save_breast_cancer_data(num_data_points_per_file, folder_a)
-validate_and_store_files(folder_a, folder_c, folder_b, db_connection)
+validate_and_store_files(folder_a, folder_c, folder_b, connection)
