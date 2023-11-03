@@ -1,5 +1,6 @@
-from fastapi import FastAPI, File, HTTPException, UploadFile, Response
-from pydantic import BaseModel
+from fastapi import FastAPI, HTTPException, UploadFile
+from starlette.responses import Response
+from pydantic import BaseModel, ValidationError
 import joblib
 import pandas as pd
 from io import StringIO
@@ -36,12 +37,15 @@ class PastPrediction(BaseModel):
 
 
 @app.post('/predict', response_model=PredictionResponse)
-def predict_single(features: Features):
-    prediction = make_prediction(features)
-    return {"prediction": prediction}
+async def predict_single(payload: Features):
+    try:
+        prediction = make_prediction(payload)
+        return {"prediction": prediction}
+    except ValidationError as e:
+        raise HTTPException(status_code=422, detail=e.errors())
 
 
-@app.post('/bulk_predict', response_model=Response)
+@app.post('/bulk_predict', response_model=None)
 async def predict_bulk(file: UploadFile):
     try:
         csv_text = await file.read()
