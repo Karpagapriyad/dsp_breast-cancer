@@ -51,7 +51,7 @@ def create_table(connection, table_name, table_schema):
 
 
 # Function to insert data from CSV file into the table
-def insert_data_from_csv(file_path):
+def insert_data_from_csv(table_name, file_path, connection):
     cursor = connection.cursor()
     table_check_query = "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'your_table_name')"
     cursor.execute(table_check_query)
@@ -67,7 +67,7 @@ def insert_data_from_csv(file_path):
     for row in csv_reader:
         id, radius_mean, texture_mean, perimeter_mean, area_mean, diagnosis = row
         insert_query = f'''
-            INSERT INTO your_table_name (id, radius_mean, texture_mean, perimeter_mean, area_mean, diagnosis)
+            INSERT INTO table_name (id, radius_mean, texture_mean, perimeter_mean, area_mean, diagnosis)
             VALUES ({id}, {radius_mean}, {texture_mean}, {perimeter_mean}, {area_mean}, '{diagnosis}')
             '''
         cursor.execute(insert_query)
@@ -77,7 +77,7 @@ def insert_data_from_csv(file_path):
 
 
 # Function to insert a single data point from JSON file into the table
-def insert_json_data_into_table(json_filename, table_name, dbname, username, password, host, port):
+def insert_json_data(table_name, json_data, connection):
     cursor = connection.cursor()
     table_check_query = "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'your_table_name')"
     cursor.execute(table_check_query)
@@ -94,8 +94,8 @@ def insert_json_data_into_table(json_filename, table_name, dbname, username, pas
     diagnosis = json_data.get("diagnosis")
 
     insert_query = f'''
-                INSERT INTO your_table_name (id, radius_mean, texture_mean, perimeter_mean, area_mean, diagnosis)
-                VALUES ({id}, {radius_mean}, {texture_mean}, {perimeter_mean}, {area_mean}, '{diagnosis}')
+                INSERT INTO table_name (id, radius_mean, texture_mean, perimeter_mean, area_mean, diagnosis)
+                VALUES ({id},{radius_mean},{texture_mean},{perimeter_mean},{area_mean},'{diagnosis}')
             '''
     cursor.execute(insert_query)
     connection.commit()
