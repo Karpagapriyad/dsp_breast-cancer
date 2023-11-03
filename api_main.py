@@ -1,7 +1,11 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile, Response
 from pydantic import BaseModel
 import joblib
 import psycopg2
+import pandas as pd
+from io import StringIO
+from db_connection import connect_to_database, insert_data_from_csv, insert_json_data
+from preprocess import preprocessing
 
 app = FastAPI()
 
@@ -9,8 +13,8 @@ app = FastAPI()
 model = joblib.load('model_lri.joblib')
 
 # Set up PostgreSQL connection
-conn = psycopg2.connect(database="your_db", user="postgres", password="Jerry@126", host="localhost", port="5432")
-cursor = conn.cursor()
+connection = connect_to_database()
+cursor = connection.cursor()
 
 class Features(BaseModel):
     mean_radius: float
@@ -27,11 +31,29 @@ class PastPrediction(BaseModel):
 
 @app.post('/predict', response_model=PredictionResponse)
 def predict_single(features: Features):
-    return predict([features])
+    prediction = make_prediction(features)
+    return {"prediction": prediction}
 
-@app.post('/bulk_predict', response_model=PredictionResponse)
-def predict_bulk(features_list: List[Features]):
-    return predict(features_list)
+@app.post('/bulk_predict', response_model=Response)
+async def predict_bulk(file: UploadFile):
+    try:
+        csv_text = await file.read()
+        df = pd.read_csv(StringIO(csv_text.decode('utf-8')))
+        
+        # Preprocess the CSV data using the provided Preprocessing function
+        processed_df = preprocessing(df)
+        
+        # Make predictions using the loaded model
+        predictions = [make_prediction(Features(**row)) for row in processed_df.to_dict('records')]
+        
+        # Create a CSV string with predictions appended to features
+        csv_data = processed_df.copy()
+        csv_data['prediction'] = predictions
+        csv_string = csv_data.to_csv(index=False)
+        
+        return Response(content=csv_string, media_type="text/csv", headers={"Content-Disposition": "attachment; filename=predictions.csv"})
+    except Exception as e:
+        raise HTTPException(status_code=400, detail="Error processing the bulk data")
 
 def predict(features):
     if isinstance(features, list):
@@ -56,19 +78,23 @@ def make_prediction(features):
     # Map prediction to 'benign' or 'malignant'
     prediction_label = 'benign' if prediction == 0 else 'malignant'
 
-    # Save features and prediction to PostgreSQL
-    cursor.execute("INSERT INTO past_predictions (mean_radius, mean_texture, mean_perimeter, mean_area, prediction) VALUES (%s, %s, %s, %s, %s)", (features.mean_radius, features.mean_texture, features.mean_perimeter, features.mean_area, prediction_label))
-    conn.commit()
+    # Append prediction to features
+    features_json = features.json()
+    features_json["prediction"] = prediction_label
+
+    # Save features and prediction to the database
+    insert_json_data(json_data=features_json)  # Function to insert JSON data
+    insert_data_from_csv(csv_data=features_json)  # Function to insert CSV data
 
     return prediction_label
 
 @app.get('/past_predictions', response_model=List[PastPrediction])
 def get_past_predictions():
-    cursor.execute("SELECT mean_radius, mean_texture, mean_perimeter, mean_area, prediction FROM past_predictions")
+    cursor.execute("SELECT features, prediction FROM past_predictions")
     past_predictions = []
     for row in cursor.fetchall():
-        features = Features(mean_radius=row[0], mean_texture=row[1], mean_perimeter=row[2], mean_area=row[3])
-        prediction_label = row[4]
-        past_predictions.append({"features": features, "prediction": prediction_label})
+        features_json = json.loads(row[0])
+        prediction_label = row[1]
+        past_predictions.append({"features": features_json, "prediction": prediction_label})
 
     return past_predictions
