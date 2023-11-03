@@ -1,18 +1,6 @@
-import psycopg2
+from db_connection import connect_to_database
 import csv
 import json
-
-
-# Function to establish a database connection
-def connect_to_database(dbname, username, password, host, port):
-    conn = psycopg2.connect(
-        dbname=dbname,
-        user=username,
-        password=password,
-        host=host,
-        port=port
-    )
-    return conn
 
 
 # Function to check if a database exists
@@ -40,14 +28,20 @@ def create_database_if_not_exists(connection, new_database_name):
 
 
 # Function to check if a table exists
-def create_table(connection, table_name, table_schema):
+def create_table(connection):
     cursor = connection.cursor()
-
-    cursor.execute(f"CREATE TABLE {table_name} ({table_schema});")
-    print(f"Table '{table_name}' created successfully.")
-
+    create_table_query = '''
+                CREATE TABLE IF NOT EXISTS your_table_name (
+                    id SERIAL PRIMARY KEY,
+                    radius_mean FLOAT,
+                    texture_mean FLOAT,
+                    perimeter_mean FLOAT,
+                    area_mean FLOAT,
+                    diagnosis VARCHAR(255)
+                )
+            '''
+    cursor.execute(create_table_query)
     cursor.close()
-    connection.commit()
 
 
 # Function to insert data from CSV file into the table
@@ -58,7 +52,7 @@ def insert_data_from_csv(table_name, file_path, connection):
     table_exists = cursor.fetchone()[0]
 
     if not table_exists:
-        create_table(connection, table_name, table_schema)
+        create_table(connection)
 
         # Read data from the CSV file and insert it into the table.
     with open(file_path, 'r') as csv_file:
@@ -84,7 +78,7 @@ def insert_json_data(table_name, json_data, connection):
     table_exists = cursor.fetchone()[0]
 
     if not table_exists:
-        create_table(connection, table_name, table_schema)
+        create_table(connection)
     json_data = json.loads(json_data)  # Parse JSON string to dictionary
     id = json_data.get("id")
     radius_mean = json_data.get("radius_mean")
@@ -104,17 +98,40 @@ def insert_json_data(table_name, json_data, connection):
         cursor.close()
         connection.close()
 
-# Example usage
-if __name__ == "__main__":
-    db_name = "breast_cancer"
-    user_name = "postgres"
-    db_password = "123456"
-    db_host = "localhost"
-    port_no = "5432"
-    table_name = 'past_prediction'
-    table_schema = 'id SERIAL PRIMARY KEY, radius_mean FLOAT, texture_mean FLOAT, perimeter_mean FLOAT, area_mean FLOAT,diagnosis VARCHAR(255)'
 
-    connection = connect_to_database(db_name, user_name, db_password, db_host, port_no)
-    create_database_if_not_exists(connection, db_name)
-    create_table(connection, table_name, table_schema)
+def create_not_quality_data_table(connection):
+    cursor = connection.cursor()
+
+    # Define the SQL query to create the not quality data table.
+    create_table_query = '''
+                CREATE TABLE IF NOT EXISTS not_quality_data (
+                    id SERIAL PRIMARY KEY,
+                    file_name VARCHAR(255),
+                    negative_value_count INTEGER,
+                    missing_value_count INTEGER
+                )
+            '''
+
+    # Execute the SQL query to create the table.
+    cursor.execute(create_table_query)
+    connection.commit()
+
+
+def insert_not_quality_data(file_name, negative_value_count, missing_value_count):
+    cursor = connection.cursor()
+    insert_query = f'''
+                INSERT INTO not_quality_data (file_name, negative_value_count, missing_value_count)
+                VALUES ('{file_name}', {negative_value_count}, {missing_value_count})
+            '''
+    cursor.execute(insert_query)
+    connection.commit()
+    if connection:
+        cursor.close()
+        connection.close()
+
+
+# Example usage
+
+connection = connect_to_database()
+
 
