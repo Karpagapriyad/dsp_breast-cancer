@@ -1,11 +1,14 @@
 from fastapi import FastAPI, File, HTTPException, UploadFile, Response
 from pydantic import BaseModel
 import joblib
-import psycopg2
 import pandas as pd
 from io import StringIO
-from db_connection import connect_to_database, insert_data_from_csv, insert_json_data
-from preprocess import preprocessing
+from db_connection import connect_to_database
+from Test_Connection import insert_data_from_csv, insert_json_data
+from api_preprocesser import preprocessing
+from typing import List
+import json
+
 
 app = FastAPI()
 
@@ -16,23 +19,28 @@ model = joblib.load('model_lri.joblib')
 connection = connect_to_database()
 cursor = connection.cursor()
 
+
 class Features(BaseModel):
     mean_radius: float
     mean_texture: float
     mean_perimeter: float
     mean_area: float
 
+
 class PredictionResponse(BaseModel):
     prediction: str
+
 
 class PastPrediction(BaseModel):
     features: Features
     prediction: str
 
+
 @app.post('/predict', response_model=PredictionResponse)
 def predict_single(features: Features):
     prediction = make_prediction(features)
     return {"prediction": prediction}
+
 
 @app.post('/bulk_predict', response_model=Response)
 async def predict_bulk(file: UploadFile):
@@ -55,6 +63,7 @@ async def predict_bulk(file: UploadFile):
     except Exception as e:
         raise HTTPException(status_code=400, detail="Error processing the bulk data")
 
+
 def predict(features):
     if isinstance(features, list):
         # Handle bulk prediction
@@ -67,6 +76,7 @@ def predict(features):
         # Handle single prediction
         prediction = make_prediction(features)
         return {"prediction": prediction}
+
 
 def make_prediction(features):
     # Convert features to a list for model prediction
@@ -88,6 +98,7 @@ def make_prediction(features):
 
     return prediction_label
 
+
 @app.get('/past_predictions', response_model=List[PastPrediction])
 def get_past_predictions():
     cursor.execute("SELECT features, prediction FROM past_predictions")
@@ -98,3 +109,7 @@ def get_past_predictions():
         past_predictions.append({"features": features_json, "prediction": prediction_label})
 
     return past_predictions
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8501)
