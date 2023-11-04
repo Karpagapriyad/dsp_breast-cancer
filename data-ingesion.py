@@ -1,10 +1,10 @@
 from sklearn.datasets import load_breast_cancer
 from sklearn.impute import SimpleImputer
-from db_connection import connect_to_database()
-from Test_Connection import insert_not_quality_data(file_name, negative_value_count, missing_value_count)
+from db_connection import connect_to_database
+from Test_Connection import insert_not_quality_data
 import pandas as pd
 import os
-import psycopg2
+
 
 
 def save_breast_cancer_data(num_data_points, directory_a):
@@ -29,8 +29,7 @@ def validate_and_store_files(input_folder, output_folder_good, output_folder_bad
     # Initialize SimpleImpute to check for missing values
     impute = SimpleImputer(strategy='constant', fill_value=None)
 
-    conn = psycopg2.connect(**database)
-    cursor = conn.cursor()
+    cursor = connection.cursor()
 
     for file in csv_files:
         file_path = os.path.join(input_folder, file)
@@ -47,7 +46,7 @@ def validate_and_store_files(input_folder, output_folder_good, output_folder_bad
             negative_value_count = (data < 0).sum().sum()
             missing_value_count = data.isnull().sum().sum()
             cursor.execute(insert_not_quality_data(file, negative_value_count, missing_value_count))
-            conn.commit()
+            cursor.commit()
         else:
             # If no negative or missing values are found, move the file to the good data folder
             output_path = os.path.join(output_folder_good, file)
@@ -55,14 +54,14 @@ def validate_and_store_files(input_folder, output_folder_good, output_folder_bad
 
             # Close database connection
         cursor.close()
-        conn.close()
 
 
-connection = connect_to_database
+connection = connect_to_database()
 
-folder_a = '/Users/karpagapriyadhanraj/Desktop/EPITA/DSP/dsp_breast-cancer/Folder-A/'
-folder_b = '/Users/karpagapriyadhanraj/Desktop/EPITA/DSP/dsp_breast-cancer/Folder-C'
-folder_c = '/Users/karpagapriyadhanraj/Desktop/EPITA/DSP/dsp_breast-cancer/Folder-B'
+folder_a = 'Folder-A'
+folder_b = 'Folder-B'
+folder_c = 'Folder-C'
+
 
 num_data_points_per_file = 100
 save_breast_cancer_data(num_data_points_per_file, folder_a)
