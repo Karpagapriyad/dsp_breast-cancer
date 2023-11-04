@@ -48,11 +48,10 @@ if st.button("Predict Single Sample"):
     }
     
     # Make a request to your model API to get the prediction
-    prediction_response = requests.post("your_model_api_url", json=input_data)  # Replace with your API URL
+    prediction_response = requests.post("http://localhost:8501/predict", json=input_data)  # Replace with your API URL
     
     # Display the prediction result
-    st.write("Single Sample Prediction Result:")
-    st.write(prediction_response.json())  # Assuming the API returns JSON
+    st.write("Prediction (Single):", prediction_response["prediction"])
 
 # Section for Batch Prediction
 st.header("Batch Prediction")

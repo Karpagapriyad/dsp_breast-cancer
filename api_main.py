@@ -7,7 +7,7 @@ from io import StringIO
 from db_connection import connect_to_database, insert_data_from_csv, insert_json_data
 from preprocess import preprocessing
 
-app = FastAPI()
+app = "http://localhost:8501"
 
 # Load the machine learning model
 model = joblib.load('model_lri.joblib')
@@ -98,3 +98,7 @@ def get_past_predictions():
         past_predictions.append({"features": features_json, "prediction": prediction_label})
 
     return past_predictions
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8501)
