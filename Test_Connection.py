@@ -3,65 +3,44 @@ import csv
 import json
 
 
-# Function to check if a database exists
-def create_database_if_not_exists(new_database_name):
-    try:
-        cursor = connection.cursor()
-
-        # Check if the database exists
-        cursor.execute("SELECT 1 FROM pg_catalog.pg_database WHERE datname = %s;", (new_database_name,))
-        existing_database = cursor.fetchone()
-
-        if not existing_database:
-            # Create a new database if it doesn't exist
-            cursor.execute(f"CREATE DATABASE {new_database_name};")
-            print(f"Database '{new_database_name}' created successfully.")
-        else:
-            print(f"Database '{new_database_name}' already exists.")
-
-        # Close the cursor and commit the changes
-        cursor.close()
-        connection.commit()
-
-    except Exception as error:
-        print(f"Error: Unable to create database - {error}")
-
-
-# Function to check if a table exists
-def create_table(connection):
+def create_db(connection, db_name):
     cursor = connection.cursor()
-    create_table_query = '''
-                CREATE TABLE IF NOT EXISTS prediction_table (
-                    id SERIAL PRIMARY KEY,
-                    radius_mean FLOAT,
-                    texture_mean FLOAT,
-                    perimeter_mean FLOAT,
-                    area_mean FLOAT,
-                    diagnosis VARCHAR(255)
-                )
-            '''
+    create_db_query = f"CREATE DATABASE {db_name};"
+    cursor.execute(create_db_query)
+    cursor.close()
+
+
+def create_table(connection, table_name):
+    cursor = connection.cursor()
+    create_table_query = f"CREATE TABLE {table_name}(id SERIAL PRIMARY KEY,radius_mean FLOAT,texture_mean FLOAT,perimeter_mean FLOAT,area_mean FLOAT,diagnosis VARCHAR(255));"
     cursor.execute(create_table_query)
     cursor.close()
 
 
-# Function to insert data from CSV file into the table
-def insert_data_from_csv(table_name, file_path):
+def insert_data_from_csv(db_name,table_name, file):
     cursor = connection.cursor()
-    table_check_query = "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'prediction_table')"
+    db_check_query = f"SELECT 1 FROM pg_catalog.pg_database WHERE datname = '{db_name}';"
+    cursor.execute(db_check_query)
+    existing_database = cursor.fetchone()[0]
+
+    if not existing_database:
+        create_db(connection)
+
+
+    table_check_query = f"SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = '{table_name}');"
     cursor.execute(table_check_query)
     table_exists = cursor.fetchone()[0]
 
     if not table_exists:
         create_table(connection)
 
-        # Read data from the CSV file and insert it into the table.
     with open(file, 'r') as csv_file:
         csv_reader = csv.reader(csv_file)
-        next(csv_reader)  # Skip the header row if it exists in the CSV file.
+        next(csv_reader)
     for row in csv_reader:
         id, radius_mean, texture_mean, perimeter_mean, area_mean, diagnosis = row
         insert_query = f'''
-            INSERT INTO prediction_table (id, radius_mean, texture_mean, perimeter_mean, area_mean, diagnosis)
+            INSERT INTO table_name (id, radius_mean, texture_mean, perimeter_mean, area_mean, diagnosis)
             VALUES ({id}, {radius_mean}, {texture_mean}, {perimeter_mean}, {area_mean}, '{diagnosis}')
             '''
         cursor.execute(insert_query)
@@ -70,14 +49,19 @@ def insert_data_from_csv(table_name, file_path):
     cursor.close()
 
 
-# Function to insert a single data point from JSON file into the table
-def insert_json_data(table_name, json_data):
+def insert_json_data(db_name, table_name, json_data):
     cursor = connection.cursor()
-    table_check_query = "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = '"+table_name+"')"
+    db_check_query = f"SELECT 1 FROM pg_catalog.pg_database WHERE datname = '{db_name}';"
+    cursor.execute(db_check_query)
+    existing_database = cursor.fetchone()[0]
+
+    if not existing_database:
+        create_db(connection, db_name)
+    table_check_query = f"SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = '{table_name}');"
     cursor.execute(table_check_query)
     table_exists = cursor.fetchone()[0]
     if not table_exists:
-        create_table(connection)
+        create_table(connection,table_name)
     json_data = json.dumps(json_data)
     json_data = json.loads(json_data)  # Parse JSON string to dictionary
     radius_mean = json_data.get('mean_radius')
@@ -95,13 +79,11 @@ def insert_json_data(table_name, json_data):
     print("Data inserted successfully!")
     if connection:
         cursor.close()
-        #connection.close()
 
 
 def create_not_quality_data_table(connection):
     cursor = connection.cursor()
 
-    # Define the SQL query to create the not quality data table.
     create_table_query = '''
                 CREATE TABLE IF NOT EXISTS not_quality_data (
                     id SERIAL PRIMARY KEY,
@@ -111,7 +93,6 @@ def create_not_quality_data_table(connection):
                 )
             '''
 
-    # Execute the SQL query to create the table.
     cursor.execute(create_table_query)
     connection.commit()
 
@@ -128,8 +109,6 @@ def insert_not_quality_data(file_name, negative_value_count, missing_value_count
         cursor.close()
         connection.close()
 
-
-# Example usage
 
 connection = connect_to_database()
 

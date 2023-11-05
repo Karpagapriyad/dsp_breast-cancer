@@ -40,45 +40,23 @@ class PastPrediction(BaseModel):
 
 
 @app.post('/predict')
-def predict_single(features: Features):
-    prediction = make_prediction(features)
-    return prediction
-
-
-# @app.post('/bulk_predict', response_model=Response)
-# async def predict_bulk(file: UploadFile):
-#     try:
-#         csv_text = await file.read()
-#         df = pd.read_csv(StringIO(csv_text.decode('utf-8')))
-        
-#         # Preprocess the CSV data using the provided Preprocessing function
-#         processed_df = preprocessing(df)
-        
-#         # Make predictions using the loaded model
-#         predictions = [make_prediction(Features(**row)) for row in processed_df.to_dict('records')]
-        
-#         # Create a CSV string with predictions appended to features
-#         csv_data = processed_df.copy()
-#         csv_data['prediction'] = predictions
-#         csv_string = csv_data.to_csv(index=False)
-        
-#         return Response(content=csv_string, media_type="text/csv", headers={"Content-Disposition": "attachment; filename=predictions.csv"})
-#     except Exception as e:
-#         raise HTTPException(status_code=400, detail="Error processing the bulk data")
-
-
-def predict(features):
+def predict(features: Features):
     if isinstance(features, list):
         # Handle bulk prediction
         predictions = []
         for feature in features:
             prediction = make_prediction(feature)
             predictions.append(prediction)
-        return {"prediction": predictions}
+            # predictions['diagnosis'] = predictions
+            insert_data_from_csv("breast_cancer", "prediction_table", csv_data=prediction)
+            print("yes")
+        return prediction
     else:
         # Handle single prediction
         prediction = make_prediction(features)
-        return {"prediction": prediction}
+        insert_json_data("breast_cancer", "prediction_table", json_data=prediction)
+        print(prediction)
+        return prediction
 
 
 def make_prediction(features):
@@ -96,11 +74,7 @@ def make_prediction(features):
     # Append prediction to features
     features_json = json.loads(feature_json)
     features_json['diagnosis'] = prediction_label
-    # Save features and prediction to the database
-    insert_json_data("prediction_table", json_data=features_json)  # Function to insert JSON data
-    #insert_data_from_csv(csv_data=features_json)  # Function to insert CSV data
-
-    return prediction_label
+    return features_json
 
 
 @app.get('/past_predictions', response_model=List[PastPrediction])
