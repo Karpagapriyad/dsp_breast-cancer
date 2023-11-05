@@ -1,5 +1,4 @@
 import streamlit as st
-from psycopg2 import sql
 
 st.set_page_config(
     layout="wide",
@@ -15,3 +14,4 @@ with st.container():
     #     st.image("breast_cancer_logo.png", width=100)
     with title_col:
         st.title("Breast Cancer Prediction")
+

@@ -50,4 +50,3 @@ if csv_file is not None and st.button("Predict Batch"):
     st.write("Batch Prediction Results:")
     st.write(batch_prediction_response.json())
 
-

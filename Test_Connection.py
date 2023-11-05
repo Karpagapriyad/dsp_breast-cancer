@@ -31,7 +31,7 @@ def create_database_if_not_exists(new_database_name):
 def create_table(connection):
     cursor = connection.cursor()
     create_table_query = '''
-                CREATE TABLE IF NOT EXISTS your_table_name (
+                CREATE TABLE IF NOT EXISTS prediction_table (
                     id SERIAL PRIMARY KEY,
                     radius_mean FLOAT,
                     texture_mean FLOAT,
@@ -47,7 +47,7 @@ def create_table(connection):
 # Function to insert data from CSV file into the table
 def insert_data_from_csv(table_name, file_path):
     cursor = connection.cursor()
-    table_check_query = "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'your_table_name')"
+    table_check_query = "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'prediction_table')"
     cursor.execute(table_check_query)
     table_exists = cursor.fetchone()[0]
 
@@ -55,13 +55,13 @@ def insert_data_from_csv(table_name, file_path):
         create_table(connection)
 
         # Read data from the CSV file and insert it into the table.
-    with open(file_path, 'r') as csv_file:
+    with open(file, 'r') as csv_file:
         csv_reader = csv.reader(csv_file)
         next(csv_reader)  # Skip the header row if it exists in the CSV file.
     for row in csv_reader:
         id, radius_mean, texture_mean, perimeter_mean, area_mean, diagnosis = row
         insert_query = f'''
-            INSERT INTO table_name (id, radius_mean, texture_mean, perimeter_mean, area_mean, diagnosis)
+            INSERT INTO prediction_table (id, radius_mean, texture_mean, perimeter_mean, area_mean, diagnosis)
             VALUES ({id}, {radius_mean}, {texture_mean}, {perimeter_mean}, {area_mean}, '{diagnosis}')
             '''
         cursor.execute(insert_query)
@@ -95,7 +95,7 @@ def insert_json_data(table_name, json_data):
     print("Data inserted successfully!")
     if connection:
         cursor.close()
-        connection.close()
+        #connection.close()
 
 
 def create_not_quality_data_table(connection):
