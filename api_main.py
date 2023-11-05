@@ -1,5 +1,6 @@
-from fastapi import FastAPI, File, HTTPException, UploadFile, Response
-from pydantic import BaseModel
+from fastapi import FastAPI, HTTPException, UploadFile
+from starlette.responses import Response
+from pydantic import BaseModel, ValidationError
 import joblib
 import pandas as pd
 from io import StringIO
@@ -8,8 +9,11 @@ from Test_Connection import insert_data_from_csv, insert_json_data
 from api_preprocesser import preprocessing
 from typing import List
 import json
+import warnings
 
-app = "http://localhost:8501"
+# Filter out the scikit-learn warning
+warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
+app = FastAPI()
 
 # Load the machine learning model
 model = joblib.load('model_lri.joblib')
@@ -35,32 +39,32 @@ class PastPrediction(BaseModel):
     prediction: str
 
 
-@app.post('/predict', response_model=PredictionResponse)
+@app.post('/predict')
 def predict_single(features: Features):
     prediction = make_prediction(features)
-    return {"prediction": prediction}
+    return prediction
 
 
-@app.post('/bulk_predict', response_model=Response)
-async def predict_bulk(file: UploadFile):
-    try:
-        csv_text = await file.read()
-        df = pd.read_csv(StringIO(csv_text.decode('utf-8')))
+# @app.post('/bulk_predict', response_model=Response)
+# async def predict_bulk(file: UploadFile):
+#     try:
+#         csv_text = await file.read()
+#         df = pd.read_csv(StringIO(csv_text.decode('utf-8')))
         
-        # Preprocess the CSV data using the provided Preprocessing function
-        processed_df = preprocessing(df)
+#         # Preprocess the CSV data using the provided Preprocessing function
+#         processed_df = preprocessing(df)
         
-        # Make predictions using the loaded model
-        predictions = [make_prediction(Features(**row)) for row in processed_df.to_dict('records')]
+#         # Make predictions using the loaded model
+#         predictions = [make_prediction(Features(**row)) for row in processed_df.to_dict('records')]
         
-        # Create a CSV string with predictions appended to features
-        csv_data = processed_df.copy()
-        csv_data['prediction'] = predictions
-        csv_string = csv_data.to_csv(index=False)
+#         # Create a CSV string with predictions appended to features
+#         csv_data = processed_df.copy()
+#         csv_data['prediction'] = predictions
+#         csv_string = csv_data.to_csv(index=False)
         
-        return Response(content=csv_string, media_type="text/csv", headers={"Content-Disposition": "attachment; filename=predictions.csv"})
-    except Exception as e:
-        raise HTTPException(status_code=400, detail="Error processing the bulk data")
+#         return Response(content=csv_string, media_type="text/csv", headers={"Content-Disposition": "attachment; filename=predictions.csv"})
+#     except Exception as e:
+#         raise HTTPException(status_code=400, detail="Error processing the bulk data")
 
 
 def predict(features):
@@ -81,6 +85,8 @@ def make_prediction(features):
     # Convert features to a list for model prediction
     features_list = [features.mean_radius, features.mean_texture, features.mean_perimeter, features.mean_area]
     
+    feature_json = '{"mean_radius" : "'+str(features.mean_radius)+'","mean_texture" : "'+str(features.mean_texture)+'","mean_perimeter" : "'+str(features.mean_perimeter)+'","mean_area" : "'+str(features.mean_area)+'"}'
+    
     # Make predictions using the loaded model
     prediction = model.predict([features_list])[0]
     
@@ -88,12 +94,11 @@ def make_prediction(features):
     prediction_label = 'benign' if prediction == 0 else 'malignant'
 
     # Append prediction to features
-    features_json = features.json()
-    features_json["prediction"] = prediction_label
-
+    features_json = json.loads(feature_json)
+    features_json['diagnosis'] = prediction_label
     # Save features and prediction to the database
-    insert_json_data(json_data=features_json)  # Function to insert JSON data
-    insert_data_from_csv(csv_data=features_json)  # Function to insert CSV data
+    insert_json_data("prediction_table", json_data=features_json)  # Function to insert JSON data
+    #insert_data_from_csv(csv_data=features_json)  # Function to insert CSV data
 
     return prediction_label
 
@@ -108,7 +113,3 @@ def get_past_predictions():
         past_predictions.append({"features": features_json, "prediction": prediction_label})
 
     return past_predictions
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8501)

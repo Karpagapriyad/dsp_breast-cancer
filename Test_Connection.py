@@ -4,7 +4,7 @@ import json
 
 
 # Function to check if a database exists
-def create_database_if_not_exists(connection, new_database_name):
+def create_database_if_not_exists(new_database_name):
     try:
         cursor = connection.cursor()
 
@@ -45,7 +45,7 @@ def create_table(connection):
 
 
 # Function to insert data from CSV file into the table
-def insert_data_from_csv(table_name, file_path, connection):
+def insert_data_from_csv(table_name, file_path):
     cursor = connection.cursor()
     table_check_query = "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'your_table_name')"
     cursor.execute(table_check_query)
@@ -71,25 +71,24 @@ def insert_data_from_csv(table_name, file_path, connection):
 
 
 # Function to insert a single data point from JSON file into the table
-def insert_json_data(table_name, json_data, connection):
+def insert_json_data(table_name, json_data):
     cursor = connection.cursor()
-    table_check_query = "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'your_table_name')"
+    table_check_query = "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = '"+table_name+"')"
     cursor.execute(table_check_query)
     table_exists = cursor.fetchone()[0]
-
     if not table_exists:
         create_table(connection)
+    json_data = json.dumps(json_data)
     json_data = json.loads(json_data)  # Parse JSON string to dictionary
-    id = json_data.get("id")
-    radius_mean = json_data.get("radius_mean")
-    texture_mean = json_data.get("texture_mean")
-    perimeter_mean = json_data.get("perimeter_mean")
-    area_mean = json_data.get("area_mean")
-    diagnosis = json_data.get("diagnosis")
+    radius_mean = json_data.get('mean_radius')
+    texture_mean = json_data.get('mean_texture')
+    perimeter_mean = json_data.get('mean_perimeter')
+    area_mean = json_data.get('mean_area')
+    diagnosis = json_data.get('diagnosis')
 
     insert_query = f'''
-                INSERT INTO table_name (id, radius_mean, texture_mean, perimeter_mean, area_mean, diagnosis)
-                VALUES ({id},{radius_mean},{texture_mean},{perimeter_mean},{area_mean},'{diagnosis}')
+                INSERT INTO {table_name} (radius_mean, texture_mean, perimeter_mean, area_mean, diagnosis)
+                VALUES ({radius_mean},{texture_mean},{perimeter_mean},{area_mean},'{diagnosis}')
             '''
     cursor.execute(insert_query)
     connection.commit()
