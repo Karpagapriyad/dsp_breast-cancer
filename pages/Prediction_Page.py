@@ -1,6 +1,10 @@
+from io import StringIO
+
 import streamlit as st
 import pandas as pd
 import requests
+
+from api_preprocesser import preprocessing
 
 st.set_page_config(
     layout="wide",
@@ -31,7 +35,7 @@ if st.button("Predict Single Sample"):
         "mean_perimeter": perimeter
     }
     
-    prediction_response = requests.post("http://127.0.0.1:8000/predict", json=input_data) 
+    prediction_response = requests.post("http://127.0.0.1:8000/predict", json=input_data)
     st.write("Prediction (Single):", prediction_response.text)
 
 # Section for Batch Prediction
@@ -44,8 +48,15 @@ csv_file = st.file_uploader("Upload a CSV file", type=["csv"])
 if csv_file is not None and st.button("Predict Batch"):
     # Read the uploaded CSV file
     batch_data = pd.read_csv(csv_file)
+    batch_data = batch_data.to_json(orient='records', lines=True)
+    # formatted_data = [
+    #     {key: float(value) for key, value in entry.strip('{}').split(';') if (pair := pair.split(';')).__len__() == 2}
+    #     for entry in batch_data.split('\n') if entry.strip()
+    # ]
+    # processed_df = preprocessing(batch_data)
+    print(batch_data)
     
-    batch_prediction_response = requests.post("http://127.0.0.1:8000/predict", json=batch_data.to_dict(orient="records"))
+    batch_prediction_response = requests.post("http://127.0.0.1:8000/predict", json=batch_data)
     
     st.write("Batch Prediction Results:")
     st.write(batch_prediction_response.json())
