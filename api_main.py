@@ -5,7 +5,7 @@ import joblib
 import pandas as pd
 from io import StringIO
 from typing import Optional
-from Test_Connection import insert_json_data
+from Test_Connection import insert_json_data, past_prediction
 from api_preprocesser import preprocessing
 from typing import List
 import json
@@ -50,7 +50,12 @@ def predict(data : PredictionRequest):
         prepocessed_df = preprocessing(df)
         predictions = model.predict(prepocessed_df)
         predictions_list = predictions.tolist()
-        return {"predictions": predictions_list}
+
+        # Map 0 to "benign" and 1 to "malignant"
+        predictions_mapped = ['benign' if pred == 0 else 'malignant' for pred in predictions_list]
+
+        # Update the 'predictions' key in the dictionary
+        return {"predictions": predictions_mapped}
         
 
 
@@ -72,13 +77,13 @@ def make_prediction(features):
     return features_json
 
 
-# @app.get('/past_predictions', response_model=List[PastPrediction])
-# def get_past_predictions():
-#     cursor.execute("SELECT features, prediction FROM past_predictions")
-#     past_predictions = []
-#     for row in cursor.fetchall():
-#         features_json = json.loads(row[0])
-#         prediction_label = row[1]
-#         past_predictions.append({"features": features_json, "prediction": prediction_label})
-
-#     return past_predictions
+@app.get('/past_predictions')
+def get_past_predictions():
+    past_prediction_data = past_prediction("breast_cancer", "prediction_table")
+    return past_prediction_data
+    # past_predictions = []
+    # for row in past_prediction_data:
+    #     features_json = json.loads(row[0])
+    #     prediction_label = row[1]
+    #     past_predictions.append({"features": features_json, "prediction": prediction_label})
+    # return past_predictions

@@ -7,7 +7,7 @@ from psycopg2 import sql
 def create_db(db_name):
     connection = connect_to_postgres()
     connection.autocommit = True
-    cursor = connection.cursor()
+    cursor = connection.cursor() 
     cursor.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(db_name)))
     cursor.close()
     connection.close()
@@ -95,6 +95,34 @@ def insert_json_data(db_name, table_name, json_data):
     if connection:
         cursor.close()
         connection.close()
+        
+def past_prediction(db_name, table_name):
+    connection = connect_to_postgres()
+    cursor = connection.cursor()
+    db_check_query = f"SELECT 1 FROM pg_catalog.pg_database WHERE datname = '{db_name}';"
+    cursor.execute(db_check_query)
+    existing_database = cursor.fetchone()
+
+    if not existing_database:
+        create_db(db_name)
+    cursor.close()
+    connection.close()
+    
+    connection = connect_to_database(db_name)
+    cursor = connection.cursor()
+    table_check_query = f"SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = '{table_name}');"
+    cursor.execute(table_check_query)
+    table_exists = cursor.fetchone()[0]
+    if not table_exists:
+        create_table(db_name, table_name)
+    select_query = f'''select id, radius_mean, texture_mean, perimeter_mean, area_mean, diagnosis from {table_name}'''
+    cursor.execute(select_query)
+    predicted_data = cursor.fetchall()
+    columns = [column[0] for column in cursor.description]
+    if connection:
+        cursor.close()
+        connection.close()
+    return {"prediction_data": predicted_data, "columns" : columns}
 
 
 # def create_not_quality_data_table(connection):
