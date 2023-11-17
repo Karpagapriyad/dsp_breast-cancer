@@ -1,11 +1,11 @@
-from fastapi import FastAPI, HTTPException, UploadFile
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from starlette.responses import Response
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 import joblib
 import pandas as pd
 from io import StringIO
-from db_connection import connect_to_database
-from Test_Connection import insert_data_from_csv, insert_json_data
+from typing import Optional
+from Test_Connection import insert_json_data
 from api_preprocesser import preprocessing
 from typing import List
 import json
@@ -18,17 +18,16 @@ app = FastAPI()
 # Load the machine learning model
 model = joblib.load('model_lri.joblib')
 
-# Set up PostgreSQL connection
-connection = connect_to_database()
-cursor = connection.cursor()
-
 
 class Features(BaseModel):
     mean_radius: float
     mean_texture: float
     mean_perimeter: float
     mean_area: float
-
+    
+class PredictionRequest(BaseModel):
+    features: Optional[Features]
+    df_in: Optional[str]
 
 class PredictionResponse(BaseModel):
     prediction: str
@@ -40,23 +39,19 @@ class PastPrediction(BaseModel):
 
 
 @app.post('/predict')
-def predict(features: Features):
-    if isinstance(features, list):
-        # Handle bulk prediction
-        predictions = []
-        for feature in features:
-            prediction = make_prediction(feature)
-            predictions.append(prediction)
-            # predictions['diagnosis'] = predictions
-            insert_data_from_csv("breast_cancer", "prediction_table", csv_data=prediction)
-            print("yes")
-        return prediction
-    else:
-        # Handle single prediction
-        prediction = make_prediction(features)
+def predict(data : PredictionRequest):
+    if data.features is not None:
+        prediction = make_prediction(data.features)
         insert_json_data("breast_cancer", "prediction_table", json_data=prediction)
         print(prediction)
         return prediction
+    if data.df_in is not None:
+        df = pd.read_json(data.df_in, orient='records')
+        prepocessed_df = preprocessing(df)
+        predictions = model.predict(prepocessed_df)
+        predictions_list = predictions.tolist()
+        return {"predictions": predictions_list}
+        
 
 
 def make_prediction(features):
@@ -77,13 +72,13 @@ def make_prediction(features):
     return features_json
 
 
-@app.get('/past_predictions', response_model=List[PastPrediction])
-def get_past_predictions():
-    cursor.execute("SELECT features, prediction FROM past_predictions")
-    past_predictions = []
-    for row in cursor.fetchall():
-        features_json = json.loads(row[0])
-        prediction_label = row[1]
-        past_predictions.append({"features": features_json, "prediction": prediction_label})
+# @app.get('/past_predictions', response_model=List[PastPrediction])
+# def get_past_predictions():
+#     cursor.execute("SELECT features, prediction FROM past_predictions")
+#     past_predictions = []
+#     for row in cursor.fetchall():
+#         features_json = json.loads(row[0])
+#         prediction_label = row[1]
+#         past_predictions.append({"features": features_json, "prediction": prediction_label})
 
-    return past_predictions
+#     return past_predictions

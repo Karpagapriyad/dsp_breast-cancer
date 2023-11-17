@@ -26,7 +26,6 @@ def scale_numeric(df):
     scaler.fit(df[feature_list])
     scaled_data = scaler.transform(df[feature_list])
     scaled_df = pd.DataFrame(data=scaled_data, columns=feature_list)
-
     return scaled_df
 
 
@@ -34,5 +33,4 @@ def preprocessing(df):
     output_sieve = sieve_data(df)
     output_drop = drop_missing_rows(output_sieve)
     processed_df = scale_numeric(output_drop)
-
     return processed_df
