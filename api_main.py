@@ -5,7 +5,7 @@ import joblib
 import pandas as pd
 from io import StringIO
 from typing import Optional
-from Test_Connection import insert_json_data, past_prediction
+from Test_Connection import insert_json_data, insert_csv_data, past_prediction
 from api_preprocesser import preprocessing
 from typing import List
 import json
@@ -43,8 +43,7 @@ def predict(data : PredictionRequest):
     if data.features is not None:
         prediction = make_prediction(data.features)
         insert_json_data("breast_cancer", "prediction_table", json_data=prediction)
-        print(prediction)
-        return prediction
+        return prediction['diagnosis']
     if data.df_in is not None:
         df = pd.read_json(data.df_in, orient='records')
         prepocessed_df = preprocessing(df)
@@ -54,7 +53,9 @@ def predict(data : PredictionRequest):
         # Map 0 to "benign" and 1 to "malignant"
         predictions_mapped = ['benign' if pred == 0 else 'malignant' for pred in predictions_list]
 
-        # Update the 'predictions' key in the dictionary
+        prepocessed_df['diagnosis'] = predictions_mapped
+        insert_csv_data("breast_cancer", "prediction_table", prepocessed_df)
+        
         return {"predictions": predictions_mapped}
         
 
@@ -65,13 +66,10 @@ def make_prediction(features):
     
     feature_json = '{"mean_radius" : "'+str(features.mean_radius)+'","mean_texture" : "'+str(features.mean_texture)+'","mean_perimeter" : "'+str(features.mean_perimeter)+'","mean_area" : "'+str(features.mean_area)+'"}'
     
-    # Make predictions using the loaded model
     prediction = model.predict([features_list])[0]
     
-    # Map prediction to 'benign' or 'malignant'
     prediction_label = 'benign' if prediction == 0 else 'malignant'
-
-    # Append prediction to features
+    
     features_json = json.loads(feature_json)
     features_json['diagnosis'] = prediction_label
     return features_json
@@ -81,9 +79,4 @@ def make_prediction(features):
 def get_past_predictions():
     past_prediction_data = past_prediction("breast_cancer", "prediction_table")
     return past_prediction_data
-    # past_predictions = []
-    # for row in past_prediction_data:
-    #     features_json = json.loads(row[0])
-    #     prediction_label = row[1]
-    #     past_predictions.append({"features": features_json, "prediction": prediction_label})
-    # return past_predictions
+   
