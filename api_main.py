@@ -24,6 +24,10 @@ class Features(BaseModel):
     mean_texture: float
     mean_perimeter: float
     mean_area: float
+    
+class PredictionRequest(BaseModel):
+    features: Optional[Features]
+    df_in: Optional[str]
 
 class PredictionResponse(BaseModel):
     prediction: str
@@ -32,6 +36,7 @@ class PredictionResponse(BaseModel):
 class PastPrediction(BaseModel):
     features: Features
     prediction: str
+
 
 
 @app.post('/predict')
