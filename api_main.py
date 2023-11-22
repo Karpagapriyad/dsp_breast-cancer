@@ -24,10 +24,6 @@ class Features(BaseModel):
     mean_texture: float
     mean_perimeter: float
     mean_area: float
-    
-class PredictionRequest(BaseModel):
-    features: Optional[Features]
-    df_in: Optional[str]
 
 class PredictionResponse(BaseModel):
     prediction: str
@@ -64,6 +60,7 @@ def core_scale(df):
     scaler = joblib.load('scaler_lri.joblib')
     scaled  = scaler.transform(df)
     return scaled
+
 
 
 def make_prediction(features):
