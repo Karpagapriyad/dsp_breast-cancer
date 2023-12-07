@@ -19,7 +19,7 @@ def create_db(db_name):
 def create_table(db_name, table_name):
     connection = connect_to_database(db_name)
     cursor = connection.cursor()
-    create_table_query = f'''CREATE TABLE {table_name}(id SERIAL PRIMARY KEY,"mean radius" FLOAT,"mean texture" FLOAT,"mean perimeter" FLOAT,"mean area" FLOAT,"diagnosis" VARCHAR(255));'''
+    create_table_query = f'''CREATE TABLE {table_name}(id SERIAL PRIMARY KEY,"mean radius" FLOAT,"mean texture" FLOAT,"mean perimeter" FLOAT,"mean area" FLOAT,"diagnosis" VARCHAR(255),"timestamp" TIMESTAMP);'''
     cursor.execute(create_table_query)
     connection.commit()
     cursor.close()
@@ -52,10 +52,12 @@ def insert_json_data(db_name, table_name, json_data):
     perimeter_mean = json_data.get('mean_perimeter')
     area_mean = json_data.get('mean_area')
     diagnosis = json_data.get('diagnosis')
+    timestamp = json_data.get('timestamp')
+
 
     insert_query = f'''
-                INSERT INTO {table_name} ("mean radius", "mean texture", "mean perimeter", "mean area", diagnosis)
-                VALUES ({radius_mean},{texture_mean},{perimeter_mean},{area_mean},'{diagnosis}')
+                INSERT INTO {table_name} ("mean radius", "mean texture", "mean perimeter", "mean area", diagnosis, "timestamp")
+                VALUES ({radius_mean},{texture_mean},{perimeter_mean},{area_mean},'{diagnosis}','{timestamp}')
             '''
     cursor.execute(insert_query)
     connection.commit()
@@ -85,7 +87,7 @@ def insert_csv_data(db_name, table_name, df_data):
     if not table_exists:
         create_table(db_name, table_name)
     pd.DataFrame(df_data)
-    my_password = "xxxxx"
+    my_password = "timivic"
     encoded_password = quote_plus(my_password)
     engine = create_engine(f'postgresql://postgres:{encoded_password}@localhost/{db_name}')
     df_data.to_sql('prediction_table', con=engine, if_exists='append', index=False) 
@@ -112,8 +114,8 @@ def past_prediction(db_name, table_name):
     table_exists = cursor.fetchone()[0]
     if not table_exists:
         create_table(db_name, table_name)
-    select_query = f'''select "mean radius", "mean texture", "mean perimeter", "mean area", "diagnosis" from {table_name}'''
-    cursor.execute(select_query)
+    select_query = f'''select "mean radius", "mean texture", "mean perimeter", "mean area", "diagnosis","timestamp" from {table_name}'''
+    cursor.execute(select_query) 
     predicted_data = cursor.fetchall()
     columns = [column[0] for column in cursor.description]
     if connection:

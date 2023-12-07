@@ -10,6 +10,7 @@ from api_preprocesser import preprocessing
 from typing import List
 import json
 import warnings
+import datetime
 
 # Filter out the scikit-learn warning
 warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
@@ -56,6 +57,9 @@ def predict(data : PredictionRequest):
         predictions_mapped = ['benign' if pred == 0 else 'malignant' for pred in predictions_list]
 
         prepocessed_df['diagnosis'] = predictions_mapped
+
+        prepocessed_df['timestamp'] = datetime.datetime.now()
+
         insert_csv_data("breast_cancer", "prediction_table", prepocessed_df)
         
         return {"predictions": predictions_mapped}
@@ -83,7 +87,11 @@ def make_prediction(features):
     prediction_label = 'benign' if prediction == 0 else 'malignant'
     
     features_json = json.loads(feature_json)
+
     features_json['diagnosis'] = prediction_label
+
+    features_json['timestamp'] = datetime.datetime.now().isoformat() # for json serialization
+    
     return features_json
 
 
@@ -91,4 +99,3 @@ def make_prediction(features):
 def get_past_predictions():
     past_prediction_data = past_prediction("breast_cancer", "prediction_table")
     return past_prediction_data
-   
