@@ -1,0 +1,29 @@
+{
+  "data_asset_type": null,
+  "expectation_suite_name": "great_expectation_suite",
+  "expectations": [
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": {
+        "column": "mean radius"
+      },
+      "meta": {}
+    }
+  ],
+  "ge_cloud_id": null,
+  "meta": {
+    "citations": [
+      {
+        "batch_request": {
+          "data_asset_name": "breast_cancer_data_1.csv",
+          "data_connector_name": "default_inferred_data_connector_name",
+          "datasource_name": "great_expectation_datasource",
+          "limit": 1000
+        },
+        "citation_date": "2023-12-09T08:45:12.670254Z",
+        "comment": "Created suite added via CLI"
+      }
+    ],
+    "great_expectations_version": "0.18.3"
+  }
+}
