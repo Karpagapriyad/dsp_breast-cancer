@@ -57,6 +57,7 @@ def insert_json_data(db_name, table_name, json_data):
                 INSERT INTO {table_name} ("mean radius", "mean texture", "mean perimeter", "mean area", diagnosis)
                 VALUES ({radius_mean},{texture_mean},{perimeter_mean},{area_mean},'{diagnosis}')
             '''
+    print(insert_query)
     cursor.execute(insert_query)
     connection.commit()
     print("Data inserted successfully!")
@@ -85,7 +86,7 @@ def insert_csv_data(db_name, table_name, df_data):
     if not table_exists:
         create_table(db_name, table_name)
     pd.DataFrame(df_data)
-    my_password = "Jerry@126"
+    my_password = "123456"
     encoded_password = quote_plus(my_password)
     engine = create_engine(f'postgresql://postgres:{encoded_password}@localhost/{db_name}')
     df_data.to_sql('prediction_table', con=engine, if_exists='append', index=False) 

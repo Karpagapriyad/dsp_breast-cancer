@@ -4,7 +4,7 @@ import psycopg2
 def connect_to_postgres():
     connection = psycopg2.connect(
         user="postgres",
-        password="Jerry@126",
+        password="123456",
         host="localhost",
         port="5432"
     )
@@ -13,7 +13,7 @@ def connect_to_postgres():
 def connect_to_database(database_name):
     connection = psycopg2.connect(
         user="postgres",
-        password="Jerry@126",
+        password="123456",
         host="localhost",
         port="5432",
         database = database_name
