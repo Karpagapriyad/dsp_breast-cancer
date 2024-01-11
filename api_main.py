@@ -10,13 +10,14 @@ from api_preprocesser import preprocessing
 from typing import List
 import json
 import warnings
+import datetime
 
 # Filter out the scikit-learn warning
 warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
 app = FastAPI()
 
 # Load the machine learning model
-model = joblib.load('model_lri.joblib')
+model = joblib.load('model_lrib.joblib')
 
 
 class Features(BaseModel):
@@ -38,6 +39,7 @@ class PastPrediction(BaseModel):
     prediction: str
 
 
+
 @app.post('/predict')
 def predict(data : PredictionRequest):
     if data.features is not None:
@@ -47,17 +49,27 @@ def predict(data : PredictionRequest):
     if data.df_in is not None:
         df = pd.read_json(data.df_in, orient='records')
         prepocessed_df = preprocessing(df)
-        predictions = model.predict(prepocessed_df)
+        scaled = core_scale(prepocessed_df)
+        predictions = model.predict(scaled)
         predictions_list = predictions.tolist()
 
         # Map 0 to "benign" and 1 to "malignant"
         predictions_mapped = ['benign' if pred == 0 else 'malignant' for pred in predictions_list]
 
         prepocessed_df['diagnosis'] = predictions_mapped
+
+        prepocessed_df['timestamp'] = datetime.datetime.now()
+
         insert_csv_data("breast_cancer", "prediction_table", prepocessed_df)
         
         return {"predictions": predictions_mapped}
         
+# This function is created tp scale the input csv
+def core_scale(df):
+    scaler = joblib.load('scaler_lri.joblib')
+    scaled  = scaler.transform(df)
+    return scaled
+
 
 
 def make_prediction(features):
@@ -66,12 +78,20 @@ def make_prediction(features):
     
     feature_json = '{"mean_radius" : "'+str(features.mean_radius)+'","mean_texture" : "'+str(features.mean_texture)+'","mean_perimeter" : "'+str(features.mean_perimeter)+'","mean_area" : "'+str(features.mean_area)+'"}'
     
-    prediction = model.predict([features_list])[0]
+    scalers = joblib.load('scaler_lri.joblib')
+
+    scale_input = scalers.transform([features_list])
+
+    prediction = model.predict(scale_input)[0]
     
     prediction_label = 'benign' if prediction == 0 else 'malignant'
     
     features_json = json.loads(feature_json)
+
     features_json['diagnosis'] = prediction_label
+
+    features_json['timestamp'] = datetime.datetime.now().isoformat() # for json serialization
+    
     return features_json
 
 
@@ -79,4 +99,3 @@ def make_prediction(features):
 def get_past_predictions():
     past_prediction_data = past_prediction("breast_cancer", "prediction_table")
     return past_prediction_data
-   
