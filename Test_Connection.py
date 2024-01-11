@@ -87,7 +87,7 @@ def insert_csv_data(db_name, table_name, df_data):
     if not table_exists:
         create_table(db_name, table_name)
     pd.DataFrame(df_data)
-    my_password = "xxxxxxx"
+    my_password = "timivic"
     encoded_password = quote_plus(my_password)
     engine = create_engine(f'postgresql://postgres:{encoded_password}@localhost/{db_name}')
     df_data.to_sql('prediction_table', con=engine, if_exists='append', index=False) 
