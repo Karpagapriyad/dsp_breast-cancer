@@ -10,7 +10,7 @@ import csv
 
 def validate_data(file_path, df):
     context = gx.get_context()
-    batch_request = {'datasource_name': 'great_expectation_datasource', 'data_connector_name': 'default_inferred_data_connector_name', 'data_asset_name': 'breast_cancer_data_1.csv', 'limit': 1000}
+    batch_request = {'datasource_name': 'great_expectation_datasource', 'data_connector_name': 'default_inferred_data_connector_name', 'data_asset_name': 'breast_cancer_data_1.csv', 'limit': 5000}
     expectation_suite_name = "breast_cancer_expectation_suite"
     try:
         suite = context.get_expectation_suite(expectation_suite_name=expectation_suite_name)
@@ -57,9 +57,8 @@ def save_validate_data(df):
             csv.writer(csv_file)
         df.to_csv(folder_c+"\\"+file_name, index=False)
         
-file_path = "C:\\Users\\Jerry\\dsp_breast-cancer\\Folder-A\\breast_cancer_data_3.csv"
-file_name = "breast_cancer_data_1.csv"
-folder_c = "C:\\Users\\Jerry\\dsp_breast-cancer\\Folder-C"
-df = pd.read_csv(file_path)
-            
+file_path = "Folder-A/breast_cancer_data_2.csv"
+file_name = "breast_cancer_data_2.csv"
+folder_c = "Folder-C"
+df = pd.read_csv(file_path)         
 save_validate_data(df)
